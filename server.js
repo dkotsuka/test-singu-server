@@ -23,24 +23,14 @@ router.post("/putData", (req, res) => {
 		const db = client.db(dbName)
 		console.log("Connected successfully to server");
 
-		insertDocuments(db, () => {
+		insertVoucher(db, data, () => {
 			client.close();
 		})
 		return res.json({ success: true });
 	});
-
-
-  	const insertDocuments = function(db, callback) {
-		const collection = db.collection('documents');
-		collection.insertOne(data, function(err, result) {
-			assert.equal(err, null);
-			assert.equal(1, result.result.n);
-			assert.equal(1, result.ops.length);
-			console.log("Voucher sent to Database.");
-		});
-	}
-  
 });
+
+
 
 
 router.get('/getAllData', (req, res) => {
@@ -49,22 +39,36 @@ router.get('/getAllData', (req, res) => {
 		// perform actions on the collection object
 		console.log("Connected successfully to server");
 		
-		findDocuments(collection, () => {
-		  client.close();
+		findDocuments(collection, (docs) => {
+			client.close();
+			return res.json(docs)
 		})
 	});
-
-	const findDocuments = function(db, callback) {
-		// Get the documents collection
-		const collection = db.collection('documents');
-		// Find some documents
-		collection.find({}).toArray(function(err, docs) {
-			assert.equal(err, null);
-			return res.json(docs)
-		});
-	}
 })
 
 app.listen(3001, function () {
 	console.log('server runnin at port 3001')
 })
+
+
+// SEND ONE VOUCHER TO DATABASE
+const insertVoucher = function(db, data, callback) {
+	const collection = db.collection('documents');
+	collection.insertOne(data, function(err, result) {
+		assert.equal(err, null);
+		assert.equal(1, result.result.n);
+		assert.equal(1, result.ops.length);
+		console.log("Voucher sent to Database.");
+		callback();
+	});
+}
+
+const findDocuments = function(db, callback) {
+	// Get the documents collection
+	const collection = db.collection('documents');
+	// Find some documents
+	collection.find({}).toArray(function(err, docs) {
+		assert.equal(err, null);
+		callback(docs)
+	});
+}
