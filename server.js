@@ -36,7 +36,6 @@ router.post("/putData", (req, res) => {
 			assert.equal(err, null);
 			assert.equal(1, result.result.n);
 			assert.equal(1, result.ops.length);
-			console.log("Voucher sent to Database.");
 		});
 	}
   
