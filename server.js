@@ -1,69 +1,143 @@
-const MongoClient = require('mongodb').MongoClient;
-const assert = require('assert');
-const dbName = 'vouchers';
-const uri = "mongodb+srv://user_01:user1234@cluster0-v4so5.azure.mongodb.net/test?retryWrites=true";
-const client = new MongoClient(uri, { useNewUrlParser: true });
-const bodyParser = require("body-parser");
+const express = require('express'),
+	MongoClient = require('mongodb').MongoClient,
+	ObjectID = require('mongodb').ObjectID,
+	assert = require('assert'),
+	bodyParser = require('body-parser')
+
+const app = express(),
+	router = express.Router(),
+	uri = "mongodb+srv://user_01:user1234@cluster0-v4so5.azure.mongodb.net/test?retryWrites=true",
+	client = new MongoClient(uri, { useNewUrlParser: true }),
+	DATABASE = 'vouchers',
+	VOUCHERS = 'documents'
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
 
 
-const express = require('express')
-const app = express()
-const router = express.Router();
+// === CRUD METHODS ================================================
 
+// GET ALL VOUCHERS FROM DATABASE
+router.get('/getAll', function(req, res) {
+	client.connect(err => {
+		const collection = client.db(DATABASE).collection(VOUCHERS);
+		findDocuments(collection, {}, function(docs) {
+			console.log(docs)
+			return res.json(docs)
+			client.close()
+		})
+	})
+})
 
+// GET ONE VOUCHER FROM DATABASE
+router.get('/getOne', function(req, res) {
+	const voucherID = req.body.id
+	client.connect(err => {
+		const collection = client.db(DATABASE).collection(VOUCHERS);
+		findDocuments(collection, {'_id': ObjectID(voucherID)}, function(docs) {
+			console.log(docs)
+			return res.json(docs)
+			client.close()
+		})
+	})
+})
 
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+// INSERT VOUCHER IN DATABASE
+router.post('/post', function(req, res) {
+	const voucher = req.body
+	client.connect(err => {
+		const collection = client.db(DATABASE).collection(VOUCHERS);
+		insertDocuments(collection, voucher, function(doc) {
+			return res.json(doc)
+			client.close()
+		})
+	})
+})
 
-app.use("/api", router);
-
-router.post("/putData", (req, res) => {
+// UPDATE VOUCHER IN DATABASE
+router.put('/put', function(req, res) {
 	const data = req.body
 	client.connect(err => {
-		const db = client.db(dbName)
-		console.log("Connected successfully to server");
-
-		insertDocuments(db, () => {
-			client.close();
+		const collection = client.db(DATABASE).collection(VOUCHERS);
+		updateDocument(collection, data, function(result) {
+			return res.json(result)  // VERIFICAR SE É ISSO MESMO.
+			client.close()
 		})
-		return res.json({ success: true });
-	});
-
-
-  	const insertDocuments = function(db, callback) {
-		const collection = db.collection('documents');
-		collection.insertOne(data, function(err, result) {
-			assert.equal(err, null);
-			assert.equal(1, result.result.n);
-			assert.equal(1, result.ops.length);
-		});
-	}
-  
-});
-
-
-router.get('/getAllData', (req, res) => {
-	client.connect(err => {
-		const collection = client.db(dbName)
-		// perform actions on the collection object
-		console.log("Connected successfully to server");
-		
-		findDocuments(collection, () => {
-		  client.close();
-		})
-	});
-
-	const findDocuments = function(db, callback) {
-		// Get the documents collection
-		const collection = db.collection('documents');
-		// Find some documents
-		collection.find({}).toArray(function(err, docs) {
-			assert.equal(err, null);
-			return res.json(docs)
-		});
-	}
+	})
 })
+
+// DELETE A VOUCHER FROM DATABASE
+router.delete('/delete', function(req, res) {
+	const voucher = req.body
+	client.connect(err => {
+		const collection = client.db(DATABASE).collection(VOUCHERS);
+		removeDocument(collection, voucher._id, function(result) {
+			return res.json(result)  // VERIFICAR SE É ISSO MESMO.
+			client.close()
+		})
+	})
+})
+
+// DISABLE ONE VOUCHER
+router.put('/disable', function(req, res) {
+	const data = req.body
+	client.connect(err => {
+		const collection = client.db(DATABASE).collection(VOUCHERS);
+		disableDocument(collection, data, function(result) {
+			return res.json({success: true})
+			client.close()
+		})
+	})
+})
+
+
+
+// === MONGODB HELPER FUNCTIONS ===========================================
+
+const findDocuments = function(collection, filter, callback) {
+	collection.find(filter).toArray(function(err, docs) {
+		assert.equal(err, null)
+	    	callback(docs);
+	})
+}
+
+const insertDocuments = function(collection, voucher, callback) {
+	collection.insertOne( voucher, function(err, success) {
+		assert.equal(err, null)
+		assert.equal(1, success.result.n)
+		assert.equal(1, success.ops.length)
+		console.log("Voucher created successfully.");
+		callback(success.ops)
+	})
+}
+
+const updateDocument = function(collection, data, callback) {
+	collection.updateOne({'_id': ObjectID(data.id)}, { $set: data.voucher }, function (err, success) {
+		assert.equal(err, null)
+		assert.equal(1, success.result.n)
+    	callback(success.result)
+	})
+}
+
+const disableDocument = function(collection, data, callback) {
+	collection.updateOne({'_id': ObjectID(data.id)}, { $set: { 'disabled': true, 'disabledBy': data.user }}, function (err, success) {
+		assert.equal(err, null)
+		assert.equal(1, success.result.n)
+    	callback(success)
+	})
+}
+
+const removeDocument = function(collection, id, callback) {
+	collection.deleteOne({'_id': ObjectID(id)}, function(err, success) {
+		assert.equal(err, null)
+		assert.equal(1, success.result.n)
+		callback(result)
+	})
+}
+
+// carrega o módulo do router no app
+app.use('/api', router);
 
 app.listen(3001, function () {
-	console.log('server runnin at port 3001')
-})
+  console.log('Listening on port 3001!');
+});
